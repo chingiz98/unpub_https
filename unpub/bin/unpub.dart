@@ -12,7 +12,7 @@ main(List<String> args) async {
       abbr: 'd', defaultsTo: 'mongodb://localhost:27017/dart_pub');
   parser.addOption('proxy-origin', abbr: 'o', defaultsTo: '');
   parser.addOption('pem_path', abbr: 'c', defaultsTo: '');
-  parser.addOption('key_path', abbr: 'c', defaultsTo: '');
+  parser.addOption('key_path', abbr: 'k', defaultsTo: '');
 
   var results = parser.parse(args);
 
