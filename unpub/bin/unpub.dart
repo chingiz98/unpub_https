@@ -38,8 +38,8 @@ main(List<String> args) async {
     metaStore: unpub.MongoStore(db),
     packageStore: unpub.FileStore(baseDir),
     proxy_origin: proxy_origin.trim().isEmpty ? null : Uri.parse(proxy_origin),
-    certKeyPath: certKeyPath,
-    certPemPath: certPemPath,
+    certKeyPath: certKeyPath.isEmpty ? null : certKeyPath,
+    certPemPath: certPemPath.isEmpty ? null : certPemPath,
   );
 
   var server = await app.serve(host, port);
