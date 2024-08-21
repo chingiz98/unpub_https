@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:collection/collection.dart' show IterableExtension;
 import 'package:shelf/shelf.dart' as shelf;
+import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
@@ -39,6 +40,7 @@ class App {
   final String? overrideUploaderEmail;
   final String? certKeyPath;
   final String? certPemPath;
+  final String? whiteListPath;
 
   /// A forward proxy uri
   final Uri? proxy_origin;
@@ -59,6 +61,7 @@ class App {
     this.proxy_origin,
     this.certKeyPath,
     this.certPemPath,
+    this.whiteListPath,
   });
 
   static shelf.Response _okWithJson(Map<String, dynamic> data) =>
@@ -121,10 +124,39 @@ class App {
     return info.email!;
   }
 
+  Future<void> _checkAuthorization(shelf.Request req) async {
+    final email = await _getUploaderEmail(req);
+    if (whiteListPath == null) {
+      return;
+    }
+    final filePath = whiteListPath!;
+    final file = File(filePath);
+    if (!await file.exists()) {
+      throw 'whitelist file not found';
+    }
+    final lines = await file.readAsLines();
+    final permittedEmails = lines.toSet();
+
+    if(!permittedEmails.contains(email)) {
+      throw 'You are not authorized. Please make sure your token exists or is valid';
+    }
+  }
+
+  Middleware authInterceptor() {
+    return (Handler innerHandler) {
+      return (Request request) async {
+        print('Request intercepted: ${request.method} ${request.requestedUri}');
+        await _checkAuthorization(request);
+        return innerHandler(request);
+      };
+    };
+  }
+
   Future<HttpServer> serve([String host = '0.0.0.0', int port = 4000]) async {
     var handler = const shelf.Pipeline()
         .addMiddleware(corsHeaders())
         .addMiddleware(shelf.logRequests())
+        .addMiddleware(authInterceptor())
         .addHandler((req) async {
       // Return 404 by default
       // https://github.com/google/dart-neats/issues/1
@@ -537,8 +569,6 @@ class App {
 
     return _okWithJson({'data': data.toJson()});
   }
-
-
 
   @Route.get('/')
   @Route.get('/packages')
