@@ -159,7 +159,7 @@ class App {
           await _checkAuthorization(request);
         } on AuthException catch (e) {
           return _badRequest(
-            e.toString(),
+            e.message,
             status: HttpStatus.unauthorized,
           );
         } catch (e) {
