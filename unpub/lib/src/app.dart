@@ -13,6 +13,7 @@ import 'package:shelf_cors_headers/shelf_cors_headers.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:pub_semver/pub_semver.dart' as semver;
 import 'package:archive/archive.dart';
+import 'package:unpub/src/exceptions/auth_exception.dart';
 import 'package:unpub/src/models.dart';
 import 'package:unpub/unpub_api/lib/models.dart';
 import 'package:unpub/src/meta_store.dart';
@@ -125,34 +126,48 @@ class App {
   }
 
   Future<void> _checkAuthorization(shelf.Request req) async {
-    final email = await _getUploaderEmail(req);
+    final String email;
+    try {
+      email = await _getUploaderEmail(req);
+    } catch (e) {
+      throw AuthException(message: e.toString());
+    }
+
     if (whiteListPath == null) {
       return;
     }
     final filePath = whiteListPath!;
     final file = File(filePath);
     if (!await file.exists()) {
-      throw 'whitelist file not found';
+      throw AuthException(message: 'whitelist file not found');
     }
     final lines = await file.readAsLines();
     final permittedEmails = lines.toSet();
 
-    if(!permittedEmails.contains(email)) {
-      throw 'You are not authorized. Please make sure your token exists or is valid';
+    if (!permittedEmails.contains(email)) {
+      throw AuthException(
+        message:
+            'You are not authorized. Please make sure your token exists or is valid',
+      );
     }
   }
 
   Middleware authInterceptor() {
     return (Handler innerHandler) {
-
       return (Request request) async {
-        print('Request intercepted: ${request.method} ${request.requestedUri}');
         try {
           await _checkAuthorization(request);
-        } catch (_) {
-          return _badRequest('Not authorized test');
+        } on AuthException catch (e) {
+          return _badRequest(
+            e.toString(),
+            status: HttpStatus.unauthorized,
+          );
+        } catch (e) {
+          return _badRequest(
+            e.toString(),
+            status: HttpStatus.badRequest,
+          );
         }
-
         return innerHandler(request);
       };
     };
