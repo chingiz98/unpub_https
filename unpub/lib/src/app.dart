@@ -150,7 +150,7 @@ class App {
         try {
           await _checkAuthorization(request);
         } catch (_) {
-          return shelf.Response.unauthorized('Not authorized test');
+          return _badRequest('Not authorized test');
         }
 
         return innerHandler(request);
