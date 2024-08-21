@@ -144,9 +144,15 @@ class App {
 
   Middleware authInterceptor() {
     return (Handler innerHandler) {
+
       return (Request request) async {
         print('Request intercepted: ${request.method} ${request.requestedUri}');
-        await _checkAuthorization(request);
+        try {
+          await _checkAuthorization(request);
+        } catch (_) {
+          return shelf.Response.notFound('Not authorized test');
+        }
+
         return innerHandler(request);
       };
     };
