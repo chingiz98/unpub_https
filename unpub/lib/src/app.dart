@@ -158,11 +158,13 @@ class App {
         try {
           await _checkAuthorization(request);
         } on AuthException catch (e) {
+          print('Error: ${e.message}');
           return _badRequest(
             e.message,
             status: HttpStatus.unauthorized,
           );
         } catch (e) {
+          print('Error: ${e.toString()}');
           return _badRequest(
             e.toString(),
             status: HttpStatus.badRequest,
