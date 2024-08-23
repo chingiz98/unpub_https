@@ -603,6 +603,10 @@ class App {
     print('req params: ${req.params.toString()}');
     print('req context: ${req.context.toString()}');
 
+    final info = req.context['shelf.io.connection_info'] as HttpConnectionInfo;
+    print(info.remoteAddress.address);
+    print(info.remoteAddress.host);
+
 
     // TODO(Any): Temp remove
     //return shelf.Response.notFound(null);
