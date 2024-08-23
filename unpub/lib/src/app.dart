@@ -601,6 +601,8 @@ class App {
 
     print(req.toString());
     print('req params: ${req.params.toString()}');
+    print('req context: ${req.context.toString()}');
+
 
     // TODO(Any): Temp remove
     //return shelf.Response.notFound(null);
