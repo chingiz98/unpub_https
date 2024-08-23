@@ -598,6 +598,10 @@ class App {
   @Route.get('/packages/<name>')
   @Route.get('/packages/<name>/versions/<version>')
   Future<shelf.Response> indexHtml(shelf.Request req) async {
+
+    print(req.toString());
+    print('req params: ${req.params.toString()}');
+
     // TODO(Any): Temp remove
     //return shelf.Response.notFound(null);
     return shelf.Response.ok(index_html.content,
