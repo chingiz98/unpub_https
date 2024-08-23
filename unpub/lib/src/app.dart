@@ -179,7 +179,7 @@ class App {
     var handler = const shelf.Pipeline()
         .addMiddleware(corsHeaders())
         .addMiddleware(shelf.logRequests())
-        .addMiddleware(authInterceptor())
+        //.addMiddleware(authInterceptor())
         .addHandler((req) async {
       // Return 404 by default
       // https://github.com/google/dart-neats/issues/1
