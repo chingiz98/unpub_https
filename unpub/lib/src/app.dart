@@ -15,6 +15,7 @@ import 'package:pub_semver/pub_semver.dart' as semver;
 import 'package:archive/archive.dart';
 import 'package:unpub/src/exceptions/auth_exception.dart';
 import 'package:unpub/src/models.dart';
+import 'package:unpub/src/utils/ip_utils.dart';
 import 'package:unpub/unpub_api/lib/models.dart';
 import 'package:unpub/src/meta_store.dart';
 import 'package:unpub/src/package_store.dart';
@@ -42,6 +43,7 @@ class App {
   final String? certKeyPath;
   final String? certPemPath;
   final String? whiteListPath;
+  final String? privilegedIpListPath;
 
   /// A forward proxy uri
   final Uri? proxy_origin;
@@ -63,6 +65,7 @@ class App {
     this.certKeyPath,
     this.certPemPath,
     this.whiteListPath,
+    this.privilegedIpListPath,
   });
 
   static shelf.Response _okWithJson(Map<String, dynamic> data) =>
@@ -156,6 +159,14 @@ class App {
     return (Handler innerHandler) {
       return (Request request) async {
         try {
+          final connectionInfo =
+              request.context['shelf.io.connection_info'] as HttpConnectionInfo;
+          final isPrivilegedIp = await _isPrivilegedIp(
+            connectionInfo.remoteAddress.host,
+          );
+          if (isPrivilegedIp) {
+            return innerHandler(request);
+          }
           await _checkAuthorization(request);
         } on AuthException catch (e) {
           print('Error: ${e.message}');
@@ -173,6 +184,20 @@ class App {
         return innerHandler(request);
       };
     };
+  }
+
+  Future<bool> _isPrivilegedIp(String ip) async {
+    if (privilegedIpListPath == null) {
+      return false;
+    }
+    final filePath = privilegedIpListPath!;
+    final file = File(filePath);
+    if (!await file.exists()) {
+      return false;
+    }
+    final permittedIps = await file.readAsLines();
+
+    return IpUtils.isIpInList(ip, permittedIps);
   }
 
   Future<HttpServer> serve([String host = '0.0.0.0', int port = 4000]) async {
@@ -598,16 +623,12 @@ class App {
   @Route.get('/packages/<name>')
   @Route.get('/packages/<name>/versions/<version>')
   Future<shelf.Response> indexHtml(shelf.Request req) async {
-    // TODO(Any): Temp remove
-    //return shelf.Response.notFound(null);
     return shelf.Response.ok(index_html.content,
         headers: {HttpHeaders.contentTypeHeader: ContentType.html.mimeType});
   }
 
   @Route.get('/main.dart.js')
   Future<shelf.Response> mainDartJs(shelf.Request req) async {
-    // TODO(Any): Temp remove
-    //return shelf.Response.notFound(null);
     return shelf.Response.ok(main_dart_js.content,
         headers: {HttpHeaders.contentTypeHeader: 'text/javascript'});
   }
