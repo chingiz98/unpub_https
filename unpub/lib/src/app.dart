@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:collection/collection.dart' show IterableExtension;
 import 'package:shelf/shelf.dart' as shelf;
+import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
@@ -12,7 +13,9 @@ import 'package:shelf_cors_headers/shelf_cors_headers.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:pub_semver/pub_semver.dart' as semver;
 import 'package:archive/archive.dart';
+import 'package:unpub/src/exceptions/auth_exception.dart';
 import 'package:unpub/src/models.dart';
+import 'package:unpub/src/utils/ip_utils.dart';
 import 'package:unpub/unpub_api/lib/models.dart';
 import 'package:unpub/src/meta_store.dart';
 import 'package:unpub/src/package_store.dart';
@@ -39,6 +42,8 @@ class App {
   final String? overrideUploaderEmail;
   final String? certKeyPath;
   final String? certPemPath;
+  final String? whiteListPath;
+  final String? privilegedIpListPath;
 
   /// A forward proxy uri
   final Uri? proxy_origin;
@@ -59,6 +64,8 @@ class App {
     this.proxy_origin,
     this.certKeyPath,
     this.certPemPath,
+    this.whiteListPath,
+    this.privilegedIpListPath,
   });
 
   static shelf.Response _okWithJson(Map<String, dynamic> data) =>
@@ -121,10 +128,83 @@ class App {
     return info.email!;
   }
 
+  Future<void> _checkAuthorization(shelf.Request req) async {
+    final String email;
+    try {
+      email = await _getUploaderEmail(req);
+    } catch (e) {
+      throw AuthException(message: e.toString());
+    }
+
+    if (whiteListPath == null) {
+      return;
+    }
+    final filePath = whiteListPath!;
+    final file = File(filePath);
+    if (!await file.exists()) {
+      throw AuthException(message: 'whitelist file not found');
+    }
+    final lines = await file.readAsLines();
+    final permittedEmails = lines.toSet();
+
+    if (!permittedEmails.contains(email)) {
+      throw AuthException(
+        message:
+            'You are not authorized. Please make sure your token exists or is valid',
+      );
+    }
+  }
+
+  Middleware authInterceptor() {
+    return (Handler innerHandler) {
+      return (Request request) async {
+        try {
+          final connectionInfo =
+              request.context['shelf.io.connection_info'] as HttpConnectionInfo;
+          final isPrivilegedIp = await _isPrivilegedIp(
+            connectionInfo.remoteAddress.host,
+          );
+          if (isPrivilegedIp) {
+            return innerHandler(request);
+          }
+          await _checkAuthorization(request);
+        } on AuthException catch (e) {
+          print('Error: ${e.message}');
+          return _badRequest(
+            e.message,
+            status: HttpStatus.unauthorized,
+          );
+        } catch (e) {
+          print('Error: ${e.toString()}');
+          return _badRequest(
+            e.toString(),
+            status: HttpStatus.badRequest,
+          );
+        }
+        return innerHandler(request);
+      };
+    };
+  }
+
+  Future<bool> _isPrivilegedIp(String ip) async {
+    if (privilegedIpListPath == null) {
+      return false;
+    }
+    final filePath = privilegedIpListPath!;
+    final file = File(filePath);
+    if (!await file.exists()) {
+      return false;
+    }
+    final permittedIps = await file.readAsLines();
+
+    return IpUtils.isIpInList(ip, permittedIps);
+  }
+
   Future<HttpServer> serve([String host = '0.0.0.0', int port = 4000]) async {
     var handler = const shelf.Pipeline()
         .addMiddleware(corsHeaders())
         .addMiddleware(shelf.logRequests())
+        .addMiddleware(authInterceptor())
         .addHandler((req) async {
       // Return 404 by default
       // https://github.com/google/dart-neats/issues/1

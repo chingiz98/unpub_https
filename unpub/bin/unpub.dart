@@ -13,6 +13,8 @@ main(List<String> args) async {
   parser.addOption('proxy-origin', abbr: 'o', defaultsTo: '');
   parser.addOption('pem_path', abbr: 'c', defaultsTo: '');
   parser.addOption('key_path', abbr: 'k', defaultsTo: '');
+  parser.addOption('whitelist', abbr: 'w');
+  parser.addOption('privilegedIpList');
 
   var results = parser.parse(args);
 
@@ -22,6 +24,8 @@ main(List<String> args) async {
   var proxy_origin = results['proxy-origin'] as String;
   var certKeyPath = results['key_path'] as String;
   var certPemPath = results['pem_path'] as String;
+  var whiteListPath = results['whitelist'] as String?;
+  var privilegedIpListPath = results['privilegedIpList'] as String?;
 
   if (results.rest.isNotEmpty) {
     print('Got unexpected arguments: "${results.rest.join(' ')}".\n\nUsage:\n');
@@ -38,8 +42,10 @@ main(List<String> args) async {
     metaStore: unpub.MongoStore(db),
     packageStore: unpub.FileStore(baseDir),
     proxy_origin: proxy_origin.trim().isEmpty ? null : Uri.parse(proxy_origin),
-    certKeyPath: certKeyPath,
-    certPemPath: certPemPath,
+    certKeyPath: certKeyPath.isEmpty ? null : certKeyPath,
+    certPemPath: certPemPath.isEmpty ? null : certPemPath,
+    whiteListPath: whiteListPath,
+    privilegedIpListPath: privilegedIpListPath,
   );
 
   var server = await app.serve(host, port);
