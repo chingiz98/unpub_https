@@ -15,6 +15,7 @@ main(List<String> args) async {
   parser.addOption('key_path', abbr: 'k', defaultsTo: '');
   parser.addOption('whitelist', abbr: 'w');
   parser.addOption('privilegedIpList');
+  parser.addOption('proxyIp');
 
   var results = parser.parse(args);
 
@@ -26,6 +27,7 @@ main(List<String> args) async {
   var certPemPath = results['pem_path'] as String;
   var whiteListPath = results['whitelist'] as String?;
   var privilegedIpListPath = results['privilegedIpList'] as String?;
+  var proxyIp = results['proxyIp'] as String?;
 
   if (results.rest.isNotEmpty) {
     print('Got unexpected arguments: "${results.rest.join(' ')}".\n\nUsage:\n');
@@ -46,6 +48,7 @@ main(List<String> args) async {
     certPemPath: certPemPath.isEmpty ? null : certPemPath,
     whiteListPath: whiteListPath,
     privilegedIpListPath: privilegedIpListPath,
+    proxyIp: proxyIp,
   );
 
   var server = await app.serve(host, port);
