@@ -45,6 +45,8 @@ class App {
   final String? whiteListPath;
   final String? privilegedIpListPath;
 
+  final String? proxyIp;
+
   /// A forward proxy uri
   final Uri? proxy_origin;
 
@@ -66,6 +68,7 @@ class App {
     this.certPemPath,
     this.whiteListPath,
     this.privilegedIpListPath,
+    this.proxyIp,
   });
 
   static shelf.Response _okWithJson(Map<String, dynamic> data) =>
@@ -159,13 +162,22 @@ class App {
     return (Handler innerHandler) {
       return (Request request) async {
         try {
-          final connectionInfo =
-              request.context['shelf.io.connection_info'] as HttpConnectionInfo;
-          final isPrivilegedIp = await _isPrivilegedIp(
-            connectionInfo.remoteAddress.host,
-          );
-          if (isPrivilegedIp) {
-            return innerHandler(request);
+          final realIp = request.headers['X-Real-IP'];
+          final connectionInfo = request.context['shelf.io.connection_info'] as HttpConnectionInfo;
+          final hostIp = connectionInfo.remoteAddress.host;
+          if (realIp != null) {
+            final currentProxyIp = proxyIp ?? '';
+            final isPrivilegedIp = await _isPrivilegedIp(realIp);
+            if ((hostIp == currentProxyIp || currentProxyIp.isEmpty) && isPrivilegedIp) {
+              return innerHandler(request);
+            }
+          } else {
+            final isPrivilegedIp = await _isPrivilegedIp(
+              hostIp,
+            );
+            if (isPrivilegedIp) {
+              return innerHandler(request);
+            }
           }
           await _checkAuthorization(request);
         } on AuthException catch (e) {
